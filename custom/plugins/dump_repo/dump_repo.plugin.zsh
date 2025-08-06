@@ -1,0 +1,1 @@
+alias dump='python3 ~/.oh-my-zsh/custom/plugins/dump_repo/dump_repo.py'

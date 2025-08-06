@@ -1,0 +1,254 @@
+# This is the configuration file for remote ssh with ssh-nirvana
+# Put all functions and aliases here which needs to be run on remote machines
+
+export PATH=$PATH:/apollo/env/envImprovement/bin:/apollo/env/SDETools/bin:/apollo/bin
+
+# Aliases
+alias gl='git log --pretty=oneline --graph --decorate --all'
+alias gb='git pull --rebase'
+alias bba='bb apollo-pkg'
+alias bbp='bb build && bb apollo-pkg'
+alias bbr='echo "Total number of packages = " $(ls ./src|wc -l); brazil-recursive-cmd-parallel --allPackages $1'
+alias anttest="export ANT_ARGS='-Dtests.additional.jvmargs=-Xrunjdwp:transport=dt_socket,address=$(hostname):10000'"
+alias noanttest="export ANT_ARGS=\"\""
+alias nxrestart='sudo -H /usr/NX/bin/nxserver --restart'
+alias vfi='brazil-runtime-exec ls'
+
+# For Amazon brazil build System
+
+# Run brazil sinlge unit test
+function bbtest(){
+     brazil-build single-unit-test -DtestClass=$1&& growl "Build complete" || growl "Build failed"
+}
+
+function b() {
+	if [[ $# > 0 ]]
+	then
+		brazil $@
+	else
+		brazil ws show
+	fi
+}
+
+function bb () {
+	if [[ $1 = server ]]
+	then
+		brazil-build $*
+		if [ $? -ne 0 ]
+		then
+			growl "Coral server stopped or failed to be started"
+			return 1
+		else
+			return 0
+		fi
+	else
+		brazil-build $*
+		if [ $? -eq 0 ]
+		then
+			growl "Build complete"
+			return 0
+		else
+			growl "Build failed"
+			return 1
+		fi
+	fi
+}
+
+
+# For Amazon Apollo deployment System
+
+# Show all envs installed on current machine and run current project as that env
+function aenv() {
+          if [ -d /apollo/env ]; then
+             echo
+             echo -------
+             ls -1 /apollo/env |nl
+             echo -------
+             echo
+             echo "Enter environment number to select"
+             read envNum
+             apolloEnv `ls -1 /apollo/env |sed -n $envNum'p'`
+         fi
+}
+
+# Activate the env
+function act() {
+     ENV_NAME=$1
+     sudo runCommand -a Activate -e $ENV_NAME && tail -f /apollo/env/$ENV_NAME/var/output/logs/PMAdmin.log
+}
+ 
+# Deactivate the env
+function deact() {
+     sudo runCommand -a Deactivate -e $1
+}
+
+function react() {
+     bb build && bb apollo-pkg && act $1
+}
+
+# Other Amazon utilities
+# Decrypt AmazonId
+function de(){
+     decrypt.rb $1
+}
+ 
+# Encrypt AmazonId
+function en(){
+     encrypt.rb $1
+}
+ 
+ # Decrypt ChargebackId
+function dech(){
+     de A`echo $1 | cut -dC -f2,3,4,5`
+}
+ 
+ # Encrypt ChargebackId
+function ench(){
+      echo C`en $1|cut -dA -f2,3,4,5`
+}
+
+setupIfOnlyOneApolloEnv() {
+     if [ `ls -1 /apollo/env 2>/dev/null | wc -l` = "1" ]; then
+         apolloEnv `ls -1 /apollo/env`
+     fi
+}
+setupIfOnlyOneApolloEnv
+ 
+sum() {
+     local -i SUM=0
+     while read NUM; do 
+         (( SUM += 10#$NUM ))
+     done
+     echo $SUM
+}
+ 
+if [ ! -d "$HOME" ]; then
+     [[ -d "/tmp/$USER" ]] || mkdir "/tmp/$USER"  
+     export HOME="/tmp/$USER"
+fi
+ 
+remotehost() {
+     grep ^REMOTE_ADDR | sort | uniq -c | sort -rn | sed s/REMOTE_ADDR=// | awk '{system("echo " $1 ", `host " $2 "`")}'
+}
+ 
+ 
+colorlog() {
+     [ -n "$1" ] && SEDFLAGS="-u"  # use unbuffered mode with input file
+     sed $SEDFLAGS '
+         s/\(\[DEBUG\]\)/\o033[36m\1\o033[0m/g
+         s/\(\[INFO\]\)/\o033[32m\1\o033[0m/g
+         s/\(\[WARN[ING]\{3\}\]\)/\o033[33m\1\o033[0m/g
+         s/\(\[ERROR\]\)/\o033[31m\1\o033[0m/g
+         s/\(\[FATAL\]\)/\o033[31;1m\1\o033[0m/g
+         s/\([A-Za-z]\{3\} [A-Za-z]\{3\} [0-9]\{2\} [0-9:]\{8\} [1-9][0-9]\{3\} [A-Z]\{3\}\)/\o033[34m\1\o033[0m/g
+     ' $1
+}
+ 
+oltoday() {
+     local region=`echo $(hostname)|grep -o "na\|eu\|us-west-2" |awk '{region=$0} /us-west-2/{region="fe"}  {print toupper(region)}'|head -n1`
+     local date_folder=`date '+%Y/%m/%d'`
+     local file_path="/onlinelogs/$1/$region/Prod/$date_folder"
+     cd $file_path
+}
+ 
+ 
+u () {
+        set -A ud
+        ud[1+${1-1}]=
+        cd ${(j:../:)ud}
+}
+ # Make it easy to use less +F instead of tail -f.  With less +F you can scroll backwards and pause the tailing.
+function lessf() {less +F $1}
+ 
+# Make less with log file colorful
+function lessl() {colorlog $1 |less -R} 
+
+# Get the most recent log file in a folder with a particular prefix (relies on date/time postfix)
+function mostRecent () { find $2 -name "$1*" | sort -r | head -1}
+  
+# Function for tailing PMAdmin log for a particular environment
+function tpm() {lessf /apollo/env/$1/var/output/logs/PMAdmin.log}
+  
+# Function for tailing application log for a particular environment.  Also adds highlighting
+function tapp() {tail -f $(mostRecent application /apollo/env/$1/var/output/logs/) | highlight }
+  
+# Function for tailing service log for a particular environment
+function tsl() {lessf $(mostRecent service_log /apollo/env/$1/var/output/logs/) }
+  
+# Function for determining which Coral service is using a port
+function whichservice () {sudo lsof -p $(pstree -p | grep -B20 $(sudo netstat -antpl  | grep $1 | grep 'LISTEN' | perl -nle 'm/(\d+)\/java/; print $1') | grep 'processmanager' | tail -n 1 | perl -nle 'm/processmanager\((\d+)\)/; print $1') | grep "/apollo/_env/" | perl -nle 'm/\_env\/(\w*)./; print    $1'}
+
+#Apollo commands
+cdl() { cd "/apollo/env/$1/var/output/logs";ls -lrt }
+cda() { cd "/apollo/env/$1" }
+ 
+#Set up zcat with progress bar
+pz() { pv $1|zcat }
+
+# Get SYSTEM_ERROR from service log
+se() { qlgrep 'SYSTEM_ERROR=1' }
+ 
+# Set up function for RecordStream
+r () {
+         recs-fromservicelog $*
+}
+ 
+rg () {
+         recs-grep $*
+}
+ 
+rt() {
+         recs-totable $*
+}
+ 
+ 
+# Setup Growl
+growl() { echo -e $'\e]9;'${1}'\007' ; return ; }
+
+# Chargeback DB loading
+
+function yasql_connect() {
+         [ $# -ne 3 ] && echo "Wrong parameter passed. Usage: yasql_connect username password db" && exit 1
+         yasql $1/$2@$3
+}
+ 
+function getChargebackUserName(){
+     echo $(odin-get com.amazon.pyop.personal.tonyhu.trms.chargeback_ro | head -n1) 
+}
+ 
+function getChargebackPassword(){
+     echo $(odin-get com.amazon.pyop.personal.tonyhu.trms.chargeback_ro | tail -n1) 
+}
+ 
+function ya(){
+         echo "Performing DB export settings"
+         export ORACLE_VERSION=10.2.0.2
+         export ORACLE_HOME=/opt/app/oracle/product/${ORACLE_VERSION}/client
+         export PATH=~/bin:$ORACLE_HOME/bin:$PATH
+         export PATH=/apollo/env/FraudOpsAlpha/perl-scripts:$PATH:/apollo/env/envImprovement/bin
+         export PATH=/apollo/env/YaSQL/bin:$PATH
+         export LD_LIBRARY_PATH=/apollo/env/SDETools/lib:$ORACLE_HOME/LIB:$LD_LIBRARY_PATH
+         local region="na"
+         if [[ $(hostname) == *.iad*  ]]; then 
+                 region="na"
+         elif [[ $(hostname) == *dub4* ]]; then
+                 region="eu"
+         elif [[ $(hostname) == *pdx*  ]]; then
+                 region="fe"
+         elif [[ $(hostname) == *pek* ]]; then
+                     region="cn"
+         fi
+         
+         local sid="frds1$region"
+         local username=$(getChargebackUserName)
+         local password=$(getChargebackPassword)
+         yasql_connect $username $password $sid
+}
+ 
+if [[ $(hostname) == dispute-management-*  ]];then
+   ya;
+fi
+ 
+autoload -U compinit
+compinit
+compdef '_files -/ -W /apollo/env' -P cdl cda act deact react
