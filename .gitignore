@@ -1,0 +1,64 @@
+# Oh My Zsh specific
+cache/
+log/
+*.log
+
+# Third-party plugins (install separately)
+custom/plugins/zsh-autosuggestions/
+custom/plugins/zsh-completions/
+custom/plugins/zsh-syntax-highlighting/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# VSCode
+.vscode/
+
+# Personal configuration files
+.zshrc
+.zsh_history
+.zsh_sessions/
+
+# AWS credentials and configs
+.aws/
+aws.config
+aws.credentials
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
