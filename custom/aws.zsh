@@ -41,21 +41,21 @@ aws-use() {
 }
 
 # Example profile functions - customize these for your needs
-# aws-dev() {
-# 	aws-use dev
-# }
+aws-dev() {
+	aws-use dev
+}
 
-# aws-main() {
-# 	aws-use main
-# }
+aws-main() {
+	aws-use main
+}
 
-# aws-manage() {
-# 	aws-use manage
-# }
+aws-manage() {
+	aws-use manage
+}
 
-# aws-domain() {
-# 	aws-use domain
-# }
+aws-domain() {
+	aws-use domain
+}
 
 # Quick identity check
 awsme() {
